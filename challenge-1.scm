@@ -1,72 +1,56 @@
 ; http://cryptopals.com/sets/1/challenges/1/
 ; Convert hex to base64
 
-; TODO: If going from hex to decimal could we just use #x<hex value> to get decimal direcly?
-; Need to step through the process here
+(define (safe-string-head s start) ; gives 'up to' 6 or remaining
+  (let ((sl (string-length s)))
+    (if (>= sl start)
+        (string-head s start)
+        (string-head s sl)))) 
 
-(define (hex-string->integer b) (string->number b 16))
-(define (binary-string->decimal x) (string->number x 2))
+(define (safe-string-tail s end) ; gives 'up to' 6 and remaining
+  (let ((sl (string-length s)))
+    (if (>= sl end)
+        (string-tail s end)
+        (string-tail s sl)))) ; 
 
-; TODO: Use accumulator?
-; Convert from hex to bytes (should be 6 characters long in and 8 characters out)
-(define (hex-string->binary-string x)
-  (string-append (string-pad-left (number->string (hex-string->integer (string-head x 2)) 2) 8 #\0) 
-                 (if (> (string-length x) 2) (hex-string->binary-string (string-tail x 2)) "")))
+(define (string-split s split-at)
+  (define (split ss ac)
+    (if (string-null? ss)
+        ac
+        (split (safe-string-tail ss split-at) (cons (safe-string-head ss split-at) ac))))
+  (reverse (split s '())))
 
+; expects 6 character hex string and returns 24 character binary string
+(define (hex-string->binary-string hs)
+  (let ((hs-lst (string-split hs 2))
+        ; pads to length of 8 as conversion drops leading zero
+        (p (lambda (x) (string-pad-left (number->string (string->number x 16) 2) 8 #\0))))
+    (fold-right (lambda (x r) (string-append (p x) r)) "" hs-lst)))
 
-; TODO: Use accumulator?
-; There may not be 24 bits left
-(define (binary-string->decimal-list bs) 
-  ; take string of binary with length 24 and convert to integer value
-  ; create loop function
-  ; call loop function hand in empty string as first accumulator value
-  (define (convert bs ac)
-    (let ((bsl (string-length bs)))
-      (define (string-head-max s) ; gives 'up to' 6 and pads the rest with 0s
-        (if (>= bsl 6)
-            (string-head s 6)
-            (string-pad-right s 6 #\0))) ; TODO: Do we want to pad this? Maybe we just want to leave it be?
-      (define (string-tail-max s) ; gives 'up to' 6 and pads the rest with 0s
-        (if (>= bsl 6)
-            (string-tail s 6)
-            (string-tail s bsl))) ; TODO: Do we want to pad this? Maybe we just want to leave it be?
-      (if (string-null? bs)
-          ac
-          (convert (string-tail-max bs) (cons* (binary-string->decimal (string-head-max bs)) ac)))))
-  (reverse (convert bs '())))
+; maps a 24-bit binary string to a list of 4 decimals
+(define (binary-string->decimals bs) 
+  ; split out binary string into 4 6-bit strings
+  (let ((bs-lst (string-split bs 6))
+        ; converts binary string (padding with zeros if less than 6 bits) into decimal
+        (p (lambda (s) (string->number (string-pad-right (safe-string-head s 6) 6 #\0) 2))))
+    ; apply conversion to each string
+    (map p bs-lst)))
 
-; Read 6 characters at a time from hex string
-; convert to bytes
-; take 6 of 24 3x 
-; if 16 or 8, convert 1st or 2nd value but sub in = in case where missing
-; convert to int each time
-; look up base64 character
-; append to string
-; TODO: Use accumulator?
-(define (base64-encode x)
-  (let ((base64-table "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
-        (binary-string (hex-string->binary-string x)))
-    
-    (define (equalSigns)
-      (let ((mod (modulo (string-length binary-string) 24)))
-        (if (= mod 0) "" (make-string (/ (- 24 mod) 8) #\=)))) ; How many bytes were we off from 24?
-    
-    (define (decimal->base64 d)
-      (char->name(string-ref base64-table d)))
-    
-    (define (decimal->base64-character i)
-      (string-ref base64-table i))
-    
-    (define (decimal-list->base64 dl)
-      (define head (first dl))
-      (define tail (list-tail dl 1))
-      (if (null? tail)
-          (string-append (decimal->base64 head))
-          (string-append (decimal->base64 head) (decimal-list->base64 tail))))
-    
-    ; Now the framework is in place, perform encoding.
-    (define decimal-list (binary-string->decimal-list binary-string))
-    (if (null? decimal-list) "" (string-append (decimal-list->base64 decimal-list) (equalSigns)))))
+; maps a decimal value to its base64 equivalent
+(define (decimal->base64 d)
+  (let ((base64-table "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"))
+    (char->name (string-ref base64-table d))))
+
+(define (base64-encode hex-string)
+  ; split out hex string into 24-bit binary strings
+  (let ((bs-lst (map hex-string->binary-string (string-split hex-string 6))))
+    ; pad resulting text
+    (define (pad-base64 s)
+      (let ((mod (modulo (string-length hex-string) 6)))
+        (if (= mod 0) 
+            s ; full 'frame', no padding needed
+            (string-append s (make-string (/ (- 6 mod) 2) #\=))))) ; partial 'frame', pad with 1 or 2 '='s
+    (pad-base64 (apply string (map decimal->base64 (concatenate (map binary-string->decimals bs-lst)))))))
 
 ; Perform conversion
 (define hex "49276d206b696c6c696e6720796f757220627261696e206c696b65206120706f69736f6e6f7573206d757368726f6f6d")
@@ -87,7 +71,7 @@
 (define gBinary (hex-string->binary-string hex))
 ;(display (equal? binary gBinary))
 (test binary gBinary)
-(define gDec (binary-string->decimal-list gBinary))
+(define gDec (binary-string->decimals gBinary))
 ;(display (equal? dec gDec))
 (test dec gDec)
 (define gBase64 (base64-encode hex))
@@ -103,7 +87,7 @@
 (define gMaryBinary (hex-string->binary-string maryHex))
 ;(display (equal? maryBinary gMaryBinary))
 (test maryBinary gMaryBinary)
-(define gMaryDec (binary-string->decimal-list maryBinary))
+(define gMaryDec (binary-string->decimals maryBinary))
 ;(display (equal? maryDec gMaryDec))
 (test maryDec gMaryDec)
 (define gMaryBase64 (base64-encode maryHex))
