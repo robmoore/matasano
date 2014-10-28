@@ -1,4 +1,4 @@
-; http://cryptopals.com/sets/1/challenges/1/
+; http://cryptopals.com/sets/1/challenges/2/
 ; Fixed XOR
 
 ; Write a function that takes two equal-length buffers and produces their XOR combination.
@@ -59,7 +59,7 @@
 
 (define hex1 "1c0111001f010100061a024b53535009181c")
 (define hex2 "686974207468652062756c6c277320657965")
-(define res "746865206b696420646f6e277420706c6179")
+(define expected "746865206b696420646f6e277420706c6179")
 
-(define xor (bit-string->hex-string (bit-string-xor (hex-string->bit-string hex1) (hex-string->bit-string hex2))))
-(equal? res xor)
+(define xor-out (bit-string->hex-string (bit-string-xor (hex-string->bit-string hex1) (hex-string->bit-string hex2))))
+(equal? xor-out expected)
