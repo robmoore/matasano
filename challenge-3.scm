@@ -14,10 +14,7 @@
 (load "challenge-2.scm")
 
 (define encoded "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736")
-
-; Look for presence of 'e' above 10%
-; Walk through all characters and map percent of 'e's in output
-; Sort by highest value
+(define decoded "Cooking MC's like a pound of bacon")
 
 ; map character to xor output
 (define (apply-xor bit-strings key-bit-string)
@@ -30,34 +27,54 @@
 (define (bit-strings->ascii-string bs)
   (apply string (map ascii->char (map bit-string->unsigned-integer bs))))
 
-;    (apply string (map ascii->char (map bit-string->unsigned-integer xord))))
-;(define xor-map (map xor-decode (map lambdaapply-xor-with-char (string->list ascii-chars)))
-
-; fun take bit-strings
-
 (define (encoded-bit-strings->ascii-string bit-strings key-char)
   (let ((decoded-bit-strings (apply-xor-with-char bit-strings key-char)))
     (bit-strings->ascii-string decoded-bit-strings)))
 
-(define (xor-map)
+(define (freq-percentage s)
+  (let ((etaoin-char-set (string->char-set "ETAOIN SHRDLU")))
+    (define (percentage total)
+      (let ((sl (string-length s)))
+        (if (or (= total 0) (= sl 0))
+            0
+            (exact->inexact (/ total (string-length s))))))
+    (define (count chars total)
+      (if (null? chars)
+          total
+          (count (list-tail chars 1) (if (char-set-member? etaoin-char-set (car (list-head chars 1))) (+ total 1) total))))
+    (percentage (count (string->list (string-upcase s)) 0))))
+
+(define (xor-results encoded-string)
   (let ((ascii-chars (char-set-members (ascii-range->char-set 0 127)))
         ; Note: Use of reverse probably means we need to revisit bit-string-split
-        (encoded-bit-strings (reverse (bit-string-split (hex-string->bit-string encoded) 8))))
-    (map (lambda (x) (encoded-bit-strings->ascii-string encoded-bit-strings x)) ascii-chars)))
+        (encoded-bit-strings (reverse (bit-string-split (hex-string->bit-string encoded-string) 8))))
+    (define (make-list c)
+      (let ((decoded-string (encoded-bit-strings->ascii-string encoded-bit-strings c)))
+        (list c (freq-percentage decoded-string) decoded-string)))
+    (map make-list ascii-chars)))
 
-; create a function that goes through all characters in a given set and provides a count for each incident of these characters
-; namely, vowels and perhaps t's
-  
 ;sort sequence procedure. for this to work we need to create a pair (char-key : decoded string)
 
-(define wiki "57696b69")
+(define (decode encoded-string)
+  (let ((results (xor-results encoded-string)))
+    (define (comparator x y)
+      (let ((x-score (second x)) (y-score (second y)))
+        (>= x-score y-score)))
+    (if (string-null? encoded-string)
+        (error "Cannot decode empty string!")
+        ; Format of entry is (key, frequency score, decoded text)
+        (last (first (sort results comparator))))))
+
+(equal? (decode encoded) decoded)
+
+;(define wiki "57696b69")
 
 ; encode wiki using 243 
 
 ; NOTE: Use of reverse
-(define wiki-bit-strings (reverse (bit-string-split (hex-string->bit-string wiki) 8)))
+;(define wiki-bit-strings (reverse (bit-string-split (hex-string->bit-string wiki) 8)))
 
-(apply-xor-with-char wiki-binary-strings (ascii->char 243))
+;(apply-xor-with-char wiki-binary-strings (ascii->char 243))
 
 
 
