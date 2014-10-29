@@ -9,7 +9,8 @@
 ;
 ; You can do this by hand. But don't: write code to do it for you.
 ;
-; How? Devise some method for "scoring" a piece of English plaintext. Character frequency is a good metric. Evaluate each output and choose the one with the best score.
+; How? Devise some method for "scoring" a piece of English plaintext. Character frequency 
+; is a good metric. Evaluate each output and choose the one with the best score.
 
 (load "challenge-2.scm")
 
@@ -18,7 +19,7 @@
 
 ; map character to xor output
 (define (apply-xor bit-strings key-bit-string)
-  (map (lambda (x) (bit-string-xor x key-bit-string)) bit-strings)))
+  (map (lambda (bs) (bit-string-xor bs key-bit-string)) bit-strings))
 
 (define (apply-xor-with-char bit-strings key-char)
   (let ((key-bit-string (unsigned-integer->bit-string 8 (char->ascii key-char))))
@@ -46,14 +47,18 @@
 
 (define (xor-results encoded-string)
   (let ((ascii-chars (char-set-members (ascii-range->char-set 0 127)))
-        ; Note: Use of reverse probably means we need to revisit bit-string-split
-        (encoded-bit-strings (reverse (bit-string-split (hex-string->bit-string encoded-string) 8))))
+        (encoded-bit-strings (bit-string-split (hex-string->bit-string encoded-string) 8)))
     (define (make-list c)
       (let ((decoded-string (encoded-bit-strings->ascii-string encoded-bit-strings c)))
         (list c (freq-percentage decoded-string) decoded-string)))
     (map make-list ascii-chars)))
 
-;sort sequence procedure. for this to work we need to create a pair (char-key : decoded string)
+(define (encode s)
+  ; to ascii
+  ; to binary
+  ; xor
+  ; hex
+  )
 
 (define (decode encoded-string)
   (let ((results (xor-results encoded-string)))
@@ -66,15 +71,4 @@
         (last (first (sort results comparator))))))
 
 (equal? (decode encoded) decoded)
-
-;(define wiki "57696b69")
-
-; encode wiki using 243 
-
-; NOTE: Use of reverse
-;(define wiki-bit-strings (reverse (bit-string-split (hex-string->bit-string wiki) 8)))
-
-;(apply-xor-with-char wiki-binary-strings (ascii->char 243))
-
-
 

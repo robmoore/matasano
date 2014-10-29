@@ -45,7 +45,7 @@
     (if (= (bit-string-length bss) 0)
         ac
         (split (safe-bit-string-tail bss split-at) (cons (safe-bit-string-head bss split-at) ac))))
-  (split bs '())) ; bit-substring works in reverse (0 = end) so these results will be in insertion order
+  (reverse (split bs '())))
 
 (define (hex-string->bit-string hs)
   (let ((hs-lst (string-split hs 2))
@@ -55,7 +55,7 @@
 (define (bit-string->hex-string bs)
   (let ((bs-lst (bit-string-split bs 8))
         (p (lambda (x) (string-pad-left (number->string (bit-string->unsigned-integer x) 16) 2 #\0))))
-    (fold-right (lambda (x r) (string-append r (p x))) "" bs-lst)))
+    (fold-right (lambda (x r) (string-append (p x) r)) "" bs-lst)))
 
 (define hex1 "1c0111001f010100061a024b53535009181c")
 (define hex2 "686974207468652062756c6c277320657965")
