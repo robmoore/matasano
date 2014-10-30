@@ -50,11 +50,14 @@
 (define (hex-string->bit-string hs)
   (let ((hs-lst (string-split hs 2))
         (p (lambda (x) (unsigned-integer->bit-string 8 (string->number x 16)))))
-    (fold-right (lambda (x r) (bit-string-append (p x) r)) (make-bit-string 0 #f) hs-lst)))
+     (fold-right (lambda (x r) (bit-string-append (p x) r)) (make-bit-string 0 #f) hs-lst)))
 
 (define (bit-string->hex-string bs)
-  (let ((bs-lst (bit-string-split bs 8))
-        (p (lambda (x) (string-pad-left (number->string (bit-string->unsigned-integer x) 16) 2 #\0))))
+  (let ((bs-lst (bit-string-split bs 8)))
+    (bit-strings->hex-string bs-lst)))
+
+(define (bit-strings->hex-string bs-lst)
+  (let ((p (lambda (x) (string-pad-left (number->string (bit-string->unsigned-integer x) 16) 2 #\0))))
     (fold-right (lambda (x r) (string-append (p x) r)) "" bs-lst)))
 
 (define hex1 "1c0111001f010100061a024b53535009181c")
