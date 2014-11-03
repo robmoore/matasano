@@ -41,6 +41,10 @@
         (p (lambda (x) (unsigned-integer->bit-string 8 (string->number x 16)))))
      (fold-right (lambda (x r) (bit-string-append (p x) r)) (make-bit-string 0 #f) hs-lst)))
 
+(define (hex-string->bit-strings hs)
+  (let ((bs (hex-string->bit-string hs)))
+    (bit-string-split bs 8)))
+
 (define (bit-string->hex-string bs)
   (let ((bs-lst (bit-string-split bs 8)))
     (bit-strings->hex-string bs-lst)))
