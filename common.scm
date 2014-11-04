@@ -114,3 +114,25 @@
         (error "Cannot decode empty string!")
         ; Return the most likely result
         (first (sort results make-xor-results-frequency-comparator)))))
+
+(define (permutations size elements)
+  (define (flatmap proc seq) 
+    (fold-right append '() (map proc seq))) 
+  (if (zero? size)
+      '(())
+      (flatmap (lambda (p)            ; For each permutation we already have:
+                 (map (lambda (e)     ;   For each element in the set:
+                        (cons e p))   ;     Add the element to the perm'n.
+                      elements))
+               (permutations (- size 1) elements))))
+
+(define (read-file file-name)
+  (define (file->list in-port ac)
+    (let ((line (read-line in-port)))
+      (if (eof-object? line)
+          ac
+          (file->list in-port (cons line ac)))))
+  (let ((in-port (open-input-file file-name)))
+    (define contents (file->list in-port '()))
+    (close-input-port in-port)
+    contents))
