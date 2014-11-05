@@ -29,11 +29,30 @@
 ; We get more tech support questions for this challenge than any of the other ones. We promise, there aren't any 
 ; blatant errors in this text. In particular: the "wokka wokka!!!" edit distance really is 37.
 
+(load "common.scm")
+
 (define hd-example-1 "this is a test")
 (define hd-example-2 "wokka wokka!!!")
 
-; Read in 6.txt as base64 and create bit-strings
-; Need to write decode-base64 function 
+; assume we are processing a line at a time
+(define (base64->bit-string b)
+  ; use let here instead of defines?
+  (define base64-table "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
+  (define char-set:base64 (string->char-set base64-table))
+  (define (from-base64 b)
+    (let ((offset (string-find-next-char base64-table b)))
+      (if (false? offset)
+          offset
+          (unsigned-integer->bit-string 6 offset))))
+  (let ((trim-b (string-trim-right b char-set:base64)))
+    (let ((diff (- (string-length b) (string-length trim-b)))
+          (bs-lst (map from-base64 (string->list trim-b))))
+      ; Need to chop off 0, 2, or 4 zeros on end based on number of equals in incoming string
+      (fold-right bit-string-append #* (list-head bs-lst (- (length bs-lst) (* diff 2)))))))
+
+(define enc (read-file "6.txt"))
+; join together all bit-strings
+(define enc-bs (fold-right bit-string-append #* (map base64->bit-string enc)))
 
 ; Determine key size
 
