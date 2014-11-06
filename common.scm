@@ -56,6 +56,9 @@
 (define (bit-strings->ascii-string bs)
   (apply string (map ascii->char (map bit-string->unsigned-integer bs))))
 
+(define (ascii-string->bit-string s)
+  (fold-right bit-string-append #* (ascii-string->bit-strings s)))
+
 (define (ascii-string->bit-strings s)
   (let ((ascii-chars (map char->ascii (string->list s))))
     (map (lambda (c) (unsigned-integer->bit-string 8 c)) ascii-chars)))

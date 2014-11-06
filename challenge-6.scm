@@ -54,17 +54,61 @@
 ; join together all bit-strings
 (define enc-bs (fold-right bit-string-append #* (map base64->bit-string enc)))
 
-; Determine key size
+(define (calc-keysize-hamming-distances enc-bs)
+  (define (calc-distance size)
+    (define (make-keys size number)
+      (define (make-offset-pairs ranges acc)
+        (if (null? (cdr ranges)) ; if we don't have another end value, stop
+            acc
+            (make-offset-pairs (cdr ranges) (cons (list (car ranges) (cadr ranges)) acc))))
+      (define (make-key offsets)
+        (bit-substring enc-bs (car offsets) (cadr offsets)))
+      (let ((offsets (make-offset-pairs (iota (+ number 1) 0 size) '())))
+        (map make-key offsets)))
+    (define (normalized-hamming-distance key-pair)
+      (/ (hamming-distance (car key-pair) (cadr key-pair)) (bit-string-length (car key-pair))))
+    (define (avg elements)
+      (/ (fold-right + 0 elements) (length elements)))
+    (let ((bytes (* size 8)))
+      ; function to take a list of values and produce key equivalent for them (begin end)
+      ; (iota 5 0 bytes)
+      (let ((key-combos (permutations 2 (make-keys bytes 4))))
+        (let ((normalized-distances (map normalized-hamming-distance key-combos)))
+          (avg normalized-distances)))))
+  (define (make-hamming-distance-results-comparator x y)
+    (let ((x-dist (second x)) (y-dist (second y)))
+      (<= x-dist y-dist)))
+  (define (make-hamming-distance-entry size)
+    (let ((dist (calc-distance size)))
+      (list size dist)))
+  (let ((results (map make-hamming-distance-entry (iota 39 2)))) ; sizes 2-40
+    (sort results make-hamming-distance-results-comparator))))))
+
+(define (derive-key-size enc-bs)
+  (car (first (calc-keysize-hamming-distances enc-bs))))
 
 ; Break into key size blocks
+(define (make-enc-bss enc-bs size)
+  (bit-string-split enc-bs size))
+
+(define candidate-key-size (derive-key-size enc-bs))
+(define enc-bss (bit-string-split enc-bs candidate-key-size))
 
 ; Create composite blocks from the 1st byte of each block, 2nd byte of each block
+
+; use iota to create substring list 
+; map pairs to bit-string using bit-sub-string
+; fold-right to build bit-string using bit-string-append
+; maybe create list of lists to return this?
 
 ; Solve for each block as if it were encoded with single-byte XOR cipher
 
 ; For each block find the best look histogram for each key to determine which is the key
+; common-letter-frequency ETAOIN SHRDLU
 
-(define (hamming-distance a b)
+; Create a key from each 'best' individual key and decode message
+
+(define (hamming-distance a-bs b-bs)
   ; map bit-string to ones count
   (define (count-ones bs)
     (let ((end (bit-string-length bs)))
@@ -75,17 +119,7 @@
           (if (and next (< next end)) ; not false and smaller than end
               (loop (+ next 1) (+ sum 1))
               sum)))))
-  ; create a list of the xor-d results for each byte
-  (define (xor-list a-bss b-bss)
-    (define (xor a-bss b-bss acc)
-      (if (null? a-bss)
-          acc
-          (xor (cdr a-bss) (cdr b-bss) (cons (bit-string-xor (car a-bss) (car b-bss)) acc))))
-    (reverse (xor a-bss b-bss '())))
-  (let ((a-bss (ascii-string->bit-strings a))
-        (b-bss (ascii-string->bit-strings b)))
-    (let ((xor-bss (xor-list a-bss b-bss)))
-      (fold-right + 0 (map count-ones xor-bss)))))d
+  (count-ones (bit-string-xor a-bs b-bs)))
 
 ; test hamming distance
-(= (hamming-distance hd-example-1 hd-example-2) 37)
+(= (hamming-distance (ascii-string->bit-string hd-example-1) (ascii-string->bit-string hd-example-2)) 37)
