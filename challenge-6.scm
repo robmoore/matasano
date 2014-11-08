@@ -50,6 +50,20 @@
       ; Need to chop off 0, 2, or 4 zeros on end based on number of equals in incoming string
       (fold-right bit-string-append #* (list-head bs-lst (- (length bs-lst) (* diff 2)))))))
 
+; bit-string is defined in Scheme so using an alternate name here
+(define (bit-string-hamming-distance a-bs b-bs)
+  ; map bit-string to ones count
+  (define (count-ones bs)
+    (let ((end (bit-string-length bs)))
+      (let loop ((start 0)
+                 (sum 0))
+        (let ((next
+                (bit-substring-find-next-set-bit bs start end)))
+          (if (and next (< next end)) ; not false and smaller than end
+              (loop (+ next 1) (+ sum 1))
+              sum)))))
+  (count-ones (bit-string-xor a-bs b-bs)))
+
 (define enc (read-file "6.txt"))
 ; join together all bit-strings
 (define enc-bs (fold-right bit-string-append #* (map base64->bit-string enc)))
@@ -66,13 +80,11 @@
       (let ((offsets (make-offset-pairs (iota (+ number 1) 0 size) '())))
         (map make-key offsets)))
     (define (normalized-hamming-distance key-pair)
-      (/ (hamming-distance (car key-pair) (cadr key-pair)) (bit-string-length (car key-pair))))
+      (/ (bit-string-hamming-distance (car key-pair) (cadr key-pair)) (bit-string-length (car key-pair))))
     (define (avg elements)
       (/ (fold-right + 0 elements) (length elements)))
     (let ((bytes (* size 8)))
-      ; function to take a list of values and produce key equivalent for them (begin end)
-      ; (iota 5 0 bytes)
-      (let ((key-combos (permutations 2 (make-keys bytes 4))))
+      (let ((key-combos (combine (make-keys bytes 4))))
         (let ((normalized-distances (map normalized-hamming-distance key-combos)))
           (avg normalized-distances)))))
   (define (make-hamming-distance-results-comparator x y)
@@ -82,7 +94,13 @@
     (let ((dist (calc-distance size)))
       (list size dist)))
   (let ((results (map make-hamming-distance-entry (iota 39 2)))) ; sizes 2-40
-    (sort results make-hamming-distance-results-comparator))))))
+    (sort results make-hamming-distance-results-comparator)))
+
+; combines list contents into unique pairs -- (list "A", "B", "C", "D") -> (("A" "B") ("A" "C") ("A" "D") ("B" "C") ("B" "D") ("C" "D"))
+(define (combine lst)
+  (define (combine it li)
+    (map (lambda (x) (list it x)) li))
+  (flatmap (lambda (k) (combine (list-ref lst k) (list-tail lst (+ k 1)))) (iota (length lst))))
 
 (define (derive-key-size enc-bs)
   (car (first (calc-keysize-hamming-distances enc-bs))))
@@ -108,18 +126,5 @@
 
 ; Create a key from each 'best' individual key and decode message
 
-(define (hamming-distance a-bs b-bs)
-  ; map bit-string to ones count
-  (define (count-ones bs)
-    (let ((end (bit-string-length bs)))
-      (let loop ((start 0)
-                 (sum 0))
-        (let ((next
-                (bit-substring-find-next-set-bit bs start end)))
-          (if (and next (< next end)) ; not false and smaller than end
-              (loop (+ next 1) (+ sum 1))
-              sum)))))
-  (count-ones (bit-string-xor a-bs b-bs)))
-
 ; test hamming distance
-(= (hamming-distance (ascii-string->bit-string hd-example-1) (ascii-string->bit-string hd-example-2)) 37)
+(= (bit-string-hamming-distance (ascii-string->bit-string hd-example-1) (ascii-string->bit-string hd-example-2)) 37)

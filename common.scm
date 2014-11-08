@@ -39,7 +39,7 @@
 (define (hex-string->bit-string hs)
   (let ((hs-lst (string-split hs 2))
         (p (lambda (x) (unsigned-integer->bit-string 8 (string->number x 16)))))
-     (fold-right (lambda (x r) (bit-string-append (p x) r)) (make-bit-string 0 #f) hs-lst)))
+    (fold-right (lambda (x r) (bit-string-append (p x) r)) (make-bit-string 0 #f) hs-lst)))
 
 (define (hex-string->bit-strings hs)
   (let ((bs (hex-string->bit-string hs)))
@@ -99,8 +99,8 @@
     (bit-strings->ascii-string xor-results)))
 
 (define (make-xor-results-frequency-comparator x y)
-      (let ((x-score (second x)) (y-score (second y)))
-        (>= x-score y-score)))
+  (let ((x-score (second x)) (y-score (second y)))
+    (>= x-score y-score)))
 
 ; Returns a list with the most likely decoding based on ASCII characters (0 to 127) 
 ; as the key in the format: (key, frequency score, decoded text)
@@ -118,17 +118,6 @@
         ; Return the most likely result
         (first (sort results make-xor-results-frequency-comparator)))))
 
-(define (permutations size elements)
-  (define (flatmap proc seq) 
-    (fold-right append '() (map proc seq))) 
-  (if (zero? size)
-      '(())
-      (flatmap (lambda (p)            ; For each permutation we already have:
-                 (map (lambda (e)     ;   For each element in the set:
-                        (cons e p))   ;     Add the element to the perm'n.
-                      elements))
-               (permutations (- size 1) elements))))
-
 (define (read-file file-name)
   (define (file->list in-port ac)
     (let ((line (read-line in-port)))
@@ -140,4 +129,5 @@
     (close-input-port in-port)
     contents))
 
-
+(define (flatmap proc seq) 
+    (fold-right append '() (map proc seq))) 
