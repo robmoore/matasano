@@ -31,11 +31,10 @@
 
 (load "common.scm")
 
-(define hd-example-1 "this is a test")
-(define hd-example-2 "wokka wokka!!!")
+(define byte-length 8)
 
-; assume we are processing a line at a time
-(define (base64->bit-string b)
+; Assumes we are processing a line at a time. Returns a list of 8-bit bit-strings.
+(define (base64->bit-strings b)
   ; use let here instead of defines?
   (define base64-table "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
   (define char-set:base64 (string->char-set base64-table))
@@ -47,8 +46,20 @@
   (let ((trim-b (string-trim-right b char-set:base64)))
     (let ((diff (- (string-length b) (string-length trim-b)))
           (bs-lst (map from-base64 (string->list trim-b))))
-      ; Need to chop off 0, 2, or 4 zeros on end based on number of equals in incoming string
-      (fold-right bit-string-append #* (list-head bs-lst (- (length bs-lst) (* diff 2)))))))
+      (let ((trim-bs-lst (lambda (bs) (bit-substring bs (* diff 2) (bit-string-length bs)))))
+        ; Need to chop off 0, 2, or 4 zeros on end based on number of equals in incoming string
+        (let ((trimmed-bs-lst (append (except-last-pair bs-lst) (map trim-bs-lst (last-pair bs-lst)))))
+          ; Need to reverse bs-lst so we end up with bit-string built from front to back for ordering's sake.
+          ; Otherwise, we end up with the last two bits of the next item at the front of the first bit-string rather than  
+          ; what we want which is to add the next two bits from the following value to the end so get the
+          ; correct value when we substring the bit-string later.
+          ;   reversed: 010011 010101 -> 01001101 (right)
+          ; unreversed: 010110 010011 -> 10010011 (wrong)
+          (reverse (bit-string-split (fold-right bit-string-append #* (reverse trimmed-bs-lst)) 8)))))))
+
+(define base64 "TWFyeSBoYWQ=")
+(define base64-bss (base64->bit-strings base64))
+(equal? (bit-strings->ascii-string base64-bss) "Mary had")
 
 ; bit-string is defined in Scheme so using an alternate name here
 (define (bit-string-hamming-distance a-bs b-bs)
@@ -64,27 +75,35 @@
               sum)))))
   (count-ones (bit-string-xor a-bs b-bs)))
 
+(define hd-example-1 "this is a test")
+(define hd-example-2 "wokka wokka!!!")
+(= (bit-string-hamming-distance (ascii-string->bit-string hd-example-1) (ascii-string->bit-string hd-example-2)) 37)
+
 (define enc (read-file "6.txt"))
 ; join together all bit-strings
-(define enc-bs (fold-right bit-string-append #* (map base64->bit-string enc)))
+(define enc-bss (flatmap base64->bit-strings enc))
+; test that contents is in the right order
+(equal? (take enc-bss 45) (base64->bit-strings (car enc)))
 
-(define (calc-keysize-hamming-distances enc-bs)
+(define enc-bs (fold-right bit-string-append #* enc-bss))
+
+(define (calc-keysize-hamming-distances bs)
+  (define (make-offset-pairs ranges acc)
+    (if (null? (cdr ranges)) ; if we don't have another end value, stop
+        acc
+        (make-offset-pairs (cdr ranges) (cons (list (car ranges) (cadr ranges)) acc))))
+  (define (split-bit-string offsets)
+    (bit-substring bs (car offsets) (cadr offsets)))
   (define (calc-distance size)
     (define (make-keys size number)
-      (define (make-offset-pairs ranges acc)
-        (if (null? (cdr ranges)) ; if we don't have another end value, stop
-            acc
-            (make-offset-pairs (cdr ranges) (cons (list (car ranges) (cadr ranges)) acc))))
-      (define (make-key offsets)
-        (bit-substring enc-bs (car offsets) (cadr offsets)))
       (let ((offsets (make-offset-pairs (iota (+ number 1) 0 size) '())))
-        (map make-key offsets)))
+        (map split-bit-string offsets)))
     (define (normalized-hamming-distance key-pair)
       (/ (bit-string-hamming-distance (car key-pair) (cadr key-pair)) (bit-string-length (car key-pair))))
     (define (avg elements)
       (/ (fold-right + 0 elements) (length elements)))
-    (let ((bytes (* size 8)))
-      (let ((key-combos (combine (make-keys bytes 4))))
+    (let ((bytes (* size byte-length)))
+      (let ((key-combos (combine (make-keys bytes 4)))) ; test out first 4 chunks for this key-size
         (let ((normalized-distances (map normalized-hamming-distance key-combos)))
           (avg normalized-distances)))))
   (define (make-hamming-distance-results-comparator x y)
@@ -96,35 +115,30 @@
   (let ((results (map make-hamming-distance-entry (iota 39 2)))) ; sizes 2-40
     (sort results make-hamming-distance-results-comparator)))
 
-; combines list contents into unique pairs -- (list "A", "B", "C", "D") -> (("A" "B") ("A" "C") ("A" "D") ("B" "C") ("B" "D") ("C" "D"))
-(define (combine lst)
-  (define (combine it li)
-    (map (lambda (x) (list it x)) li))
-  (flatmap (lambda (k) (combine (list-ref lst k) (list-tail lst (+ k 1)))) (iota (length lst))))
-
 (define (derive-key-size enc-bs)
   (car (first (calc-keysize-hamming-distances enc-bs))))
 
-; Break into key size blocks
-(define (make-enc-bss enc-bs size)
-  (bit-string-split enc-bs size))
-
+; Derive key size using lowest scoring hamming-distance
 (define candidate-key-size (derive-key-size enc-bs))
-(define enc-bss (bit-string-split enc-bs candidate-key-size))
 
 ; Create composite blocks from the 1st byte of each block, 2nd byte of each block
+(define (make-group-blocks bs group-count)
+  (let ((bss (bit-string-split bs byte-length)))
+    (let ((bss-length (length bss)))
+      (define (make-group-block group-number)
+        (let ((ks (filter (lambda (x) (< x bss-length)) (iota (integer-ceiling bss-length group-count) (- group-number 1) group-count))))
+          (map (lambda (k) (list-ref bss k)) ks)))
+      (map make-group-block (iota group-count 1)))))
 
-; use iota to create substring list 
-; map pairs to bit-string using bit-sub-string
-; fold-right to build bit-string using bit-string-append
-; maybe create list of lists to return this?
-
+; Break into key size blocks
 ; Solve for each block as if it were encoded with single-byte XOR cipher
-
-; For each block find the best look histogram for each key to determine which is the key
-; common-letter-frequency ETAOIN SHRDLU
+(define (derive-key enc-bs key-size)
+  (define (group-blocks->keys group-blocks)
+    (map decode-bit-strings-without-key group-blocks))
+  (let ((group-blocks (make-group-blocks enc-bs key-size)))
+    (list->string (map (lambda (item) (car item)) (group-blocks->keys group-blocks)))))
 
 ; Create a key from each 'best' individual key and decode message
+(define candidate-key (derive-key enc-bs candidate-key-size))
+(decode-with-repeating-key enc-bss (map char->bit-string (string->list candidate-key)))
 
-; test hamming distance
-(= (bit-string-hamming-distance (ascii-string->bit-string hd-example-1) (ascii-string->bit-string hd-example-2)) 37)

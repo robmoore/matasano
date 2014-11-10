@@ -21,13 +21,13 @@
   (let ((sl (bit-string-length s)))
     (if (>= sl end)
         (bit-substring s 0 end)
-        (bit-substring s 0 sl)))) 
+        (bit-substring s 0 sl))))
 
 (define (safe-bit-string-tail s start) ; gives 'up to' 6 and remaining
   (let ((sl (bit-string-length s)))
     (if (>= sl start)
         (bit-substring s start sl)
-        (make-bit-string 0 #f))))
+        #*)))
 
 (define (bit-string-split bs split-at)
   (define (split bss ac)
@@ -53,8 +53,8 @@
   (let ((p (lambda (x) (string-pad-left (number->string (bit-string->unsigned-integer x) 16) 2 #\0))))
     (fold-right (lambda (x r) (string-append (p x) r)) "" bs-lst)))
 
-(define (bit-strings->ascii-string bs)
-  (apply string (map ascii->char (map bit-string->unsigned-integer bs))))
+(define (bit-strings->ascii-string bs-lst)
+  (apply string (map ascii->char (map bit-string->unsigned-integer bs-lst))))
 
 (define (ascii-string->bit-string s)
   (fold-right bit-string-append #* (ascii-string->bit-strings s)))
@@ -105,16 +105,19 @@
 ; Returns a list with the most likely decoding based on ASCII characters (0 to 127) 
 ; as the key in the format: (key, frequency score, decoded text)
 (define (decode-without-key encoded-string)
-  (define (make-xor-results encoded-string)
-    (let ((ascii-chars (char-set-members (ascii-range->char-set 0 127)))
-          (encoded-bit-strings (bit-string-split (hex-string->bit-string encoded-string) 8)))
+      (let ((encoded-bit-strings (bit-string-split (hex-string->bit-string encoded-string) 8)))
+        (decode-bit-strings-without-key encoded-bit-strings)))
+
+(define (decode-bit-strings-without-key encoded-bit-strings)
+  (define (make-xor-results encoded-bit-strings)
+    (let ((ascii-chars (char-set-members (ascii-range->char-set 0 127))))
       (define (make-result c)
         (let ((decoded-string (encoded-bit-strings->ascii-string encoded-bit-strings c)))
           (list c (common-letter-frequency decoded-string) decoded-string)))
       (map make-result ascii-chars)))
-  (let ((results (make-xor-results encoded-string)))
-    (if (string-null? encoded-string)
-        (error "Cannot decode empty string!")
+  (let ((results (make-xor-results encoded-bit-strings)))
+    (if (null? encoded-bit-strings)
+        (error "Cannot decode empty bit-string list!")
         ; Return the most likely result
         (first (sort results make-xor-results-frequency-comparator)))))
 
@@ -127,7 +130,44 @@
   (let ((in-port (open-input-file file-name)))
     (define contents (file->list in-port '()))
     (close-input-port in-port)
-    contents))
+    (reverse contents)))
 
 (define (flatmap proc seq) 
     (fold-right append '() (map proc seq))) 
+
+; combines list contents into unique pairs -- (list "A", "B", "C", "D") -> (("A" "B") ("A" "C") ("A" "D") ("B" "C") ("B" "D") ("C" "D"))
+(define (combine lst)
+  (define (pair it li)
+    (map (lambda (x) (list it x)) li))
+  (flatmap (lambda (k) (pair (list-ref lst k) (list-tail lst (+ k 1)))) (iota (length lst))))
+
+(define (char->bit-string char)
+  (unsigned-integer->bit-string 8 (char->ascii char)))
+
+; Returns encoded value in hex
+(define (encode-with-repeating-key enc-string key-chars)
+  (let ((enc-bss (ascii-string->bit-strings enc-string))
+        (key-bss (map char->bit-string key-chars))))
+    (encode-with-repeating-key enc-bss key-bss))
+
+(define (encode-with-repeating-key enc-bss key-bss)
+  (define (enc bs ks acc)
+    (if (null? bs)
+        acc
+        (enc (cdr bs) (cdr ks) (cons (bit-string-xor (car bs) (car ks)) acc))))
+  (let ((circ-key-bss (apply circular-list key-bss)))
+    (bit-strings->hex-string (reverse (enc enc-bss circ-key-bss '())))))
+
+; Assumes enc-string is in hex
+(define (decode-with-repeating-key enc-string key-chars)
+  (let ((enc-bss (hex-string->bit-strings enc-string))
+        (key-bss (map char->bit-string key-chars)))
+    (decode-with-repeating-key enc-bss key-bss)))
+
+(define (decode-with-repeating-key enc-bss key-bss)
+  (define (dec bs ks acc)
+    (if (null? bs)
+        acc
+        (dec (cdr bs) (cdr ks) (cons (bit-string-xor (car bs) (car ks)) acc))))
+  (let ((circ-key-bss (apply circular-list key-bss)))
+    (bit-strings->ascii-string (reverse (dec enc-bss circ-key-bss '())))))
