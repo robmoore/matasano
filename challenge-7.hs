@@ -7,6 +7,7 @@ import qualified Crypto.Cipher.AES as CA
 import qualified Data.ByteString.Char8 as BC
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Base64 as BB (decode)
+import qualified Data.Char as DC (ord)
 
 keyString :: B.ByteString
 keyString = BC.pack "YELLOW SUBMARINE"
@@ -19,9 +20,16 @@ decrypt ctx msg =
 	either (error . show) (CA.decryptECB ctx) decodedMsg
 	where decodedMsg = BB.decode msg
 
-main = do
-	    file <- BC.readFile "7.txt"
-	    let pText = decrypt ctx $ BC.concat $ BC.lines file
-	    putStrLn $ BC.unpack pText
-  where ctx = initAES128 keyString
-      
+-- Strip off padding per method used in [PKCS5], [PKCS7], and [CMS]. Namely, look for last
+-- See section "method 1" at http://www.di-mgt.com.au/cryptopad.html
+stripPadding :: B.ByteString -> B.ByteString
+stripPadding bs = if (isPadded) then BC.take offset bs else bs 
+        where paddingCount = BC.last bs
+              offset = BC.length bs - DC.ord paddingCount
+              isPadded = BC.all (== paddingCount) (BC.drop offset bs)
+
+main = do 
+        file <- BC.readFile "7.txt"
+        let pText = decrypt ctx $ BC.concat $ BC.lines file
+        putStr $ BC.unpack $ stripPadding pText
+       where ctx = initAES128 keyString
