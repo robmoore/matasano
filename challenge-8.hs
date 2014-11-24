@@ -7,7 +7,7 @@
 -- Remember that the problem with ECB is that it is stateless and deterministic; the same 16 byte plaintext
 -- block will always produce the same 16 byte ciphertext.
 
--- (133,2.499671052631579)
+-- (133, 3.3305555555555557)
 
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -21,7 +21,7 @@ import qualified Data.List              as DL (genericLength, map, minimumBy,
                                                zip)
 import qualified Data.Ord               as DO (comparing)
 
-calcHDMean :: Fractional a => BS.ByteString -> a
+calcHDMean :: BS.ByteString -> Double
 calcHDMean line = realToFrac (sum hds) / DL.genericLength hds
   where
    combos = combine $ splitBytes line
@@ -50,6 +50,7 @@ combine xs = combine' xs []
 
 main :: IO ()
 main = do
-    hdMeans <- DL.map calcHDMean <$> BC.lines <$> BC.readFile "8.txt"
+    bytes <- DL.map (fst . B16.decode) <$> BC.lines <$> BC.readFile "8.txt"
+    let hdMeans = DL.map calcHDMean bytes
     let lowestHd = DL.minimumBy (DO.comparing snd) $ DL.zip [1..] hdMeans
-    putStrLn $ "Line # " ++ fst lowestHd ++ "with a score of " ++ snd lowestHd
+    putStrLn $ "Line # " ++ show (fst lowestHd) ++ " with a score of " ++ show (snd lowestHd)
