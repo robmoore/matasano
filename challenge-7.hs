@@ -20,7 +20,7 @@ decrypt ctx msg =
 	either (error . show) (CA.decryptECB ctx) decodedMsg
 	where decodedMsg = BB.decode msg
 
--- Strip off padding per method used in [PKCS5], [PKCS7], and [CMS]. Namely, look for last
+-- Strip off padding per method used in [PKCS5], [PKCS7], and [CMS].
 -- See section "method 1" at http://www.di-mgt.com.au/cryptopad.html
 stripPadding :: B.ByteString -> B.ByteString
 stripPadding bs = if (isPadded) then BC.take offset bs else bs 
