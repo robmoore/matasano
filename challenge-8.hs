@@ -21,19 +21,18 @@ import qualified Data.List              as DL (genericLength, map, minimumBy,
                                                zip)
 import qualified Data.Ord               as DO (comparing)
 
-evalLine :: Fractional a => BS.ByteString -> a
-evalLine line = realToFrac (sum hds) / DL.genericLength hds
+calcHDMean :: Fractional a => BS.ByteString -> a
+calcHDMean line = realToFrac (sum hds) / DL.genericLength hds
   where
    combos = combine $ splitBytes line
    xordCombos = map (uncurry $ BS.zipWith DB.xor) combos
    hds = concatMap (DL.map DB.popCount) xordCombos
 
--- TODO: Maybe we should be breaking up into 8s?
 splitBytes :: BS.ByteString -> [BS.ByteString]
 splitBytes bs = split bs []
-   where split rbs acc
-           | BS.empty == rbs = acc
-           | otherwise = split (BS.drop 16 rbs) (BS.take 16 rbs : acc)
+   where split bs acc
+           | BS.empty == bs = acc
+           | otherwise = split (BS.drop 16 bs) (BS.take 16 bs : acc)
 
 -- Combines list contents into unique pairs --
 -- ["A","B","C","D"] -> [("A","B") ("A","C") ("A","D") ("B","C") ("B","D") ("C","D")]
@@ -44,8 +43,13 @@ combine xs = combine' xs []
     combine' [] acc = acc
     combine' (z:zs) acc = combine' zs (acc ++ pair z zs)
 
+-- Test HD. Should be 37.
+-- hd bs1 bs2 = BS.zipWith DB.xor bs1 bs2
+-- hdTest = DL.map DB.popCount $ hd (BC.pack "this is a test") (BC.pack "wokka wokka!!!")
+-- sum hdTest
+
 main :: IO ()
 main = do
- hdMeans <- DL.map evalLine <$> BC.lines <$> BC.readFile "8.txt"
- let lowestHd = DL.minimumBy (DO.comparing snd) $ DL.zip [1..] hdMeans
- putStrLn $ "Line # " ++ fst lowestHd ++ "with a score of " ++ snd lowestHd
+    hdMeans <- DL.map calcHDMean <$> BC.lines <$> BC.readFile "8.txt"
+    let lowestHd = DL.minimumBy (DO.comparing snd) $ DL.zip [1..] hdMeans
+    putStrLn $ "Line # " ++ fst lowestHd ++ "with a score of " ++ snd lowestHd
